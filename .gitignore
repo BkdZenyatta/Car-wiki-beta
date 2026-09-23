@@ -1,0 +1,9 @@
+# ambiente virtual e cache do Python: nunca sobem pro GitHub
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# segredos
+.streamlit/secrets.toml
+.env
