@@ -2,7 +2,7 @@ from datetime import date
 
 import streamlit as st
 
-from carwiki import config, ui
+from carwiki import config, logs, ui
 from carwiki.search import buscar_anuncios
 
 ANO_MAX = date.today().year + 1
@@ -38,6 +38,7 @@ if enviar or (pedido and termo.strip()):
         try:
             with st.spinner("Pesquisando nos sites escolhidos..."):
                 anuncios, avisos = buscar_anuncios(termo.strip(), tuple(fontes), detalhar)
+            logs.registrar(avisos, contexto=f'Busca: "{termo.strip()}"')
             st.session_state["busca"] = {"termo": termo.strip(), "anuncios": anuncios, "avisos": avisos}
         except Exception as e:  # noqa: BLE001
             st.error(f"A busca falhou: {e}")
@@ -94,8 +95,12 @@ if not busca:
             "Depois use os filtros para refinar por ano, preço, quilometragem e local.")
     st.stop()
 
-for aviso in busca["avisos"]:
-    st.warning(aviso)
+if not busca["anuncios"]:
+    st.info("Nenhum resultado. Tente outro termo, por exemplo só a marca e o modelo.")
+    st.stop()
+elif busca["avisos"]:
+    st.caption(f"⚠️ {len(busca['avisos'])} aviso(s) técnico(s) nesta busca (sites lentos, bloqueados ou fora do ar). "
+               "Detalhes na página **Admin**.")
 
 visiveis = [a for a in busca["anuncios"] if passa(a)]
 

@@ -163,15 +163,32 @@ def _primeiro(valor):
     return valor
 
 
+# nomes de arquivo típicos de logo/ícone/imagem padrão do site, não do anúncio em si
+_IMAGEM_GENERICA = re.compile(
+    r"logo|brand|favicon|sprite|placeholder|no[-_]?photo|no[-_]?image|sem[-_]?foto|"
+    r"default|share[-_]?image|opengraph|og[-_]?image|social[-_]?card|avatar",
+    re.I,
+)
+
+
+def _foto_valida(url) -> str:
+    """Aceita a URL só se parecer foto de anúncio, não logo/ícone do site."""
+    url = url if isinstance(url, str) else ""
+    if url and _IMAGEM_GENERICA.search(url):
+        return ""
+    return url
+
+
 def parse_pagina(conteudo) -> dict:
-    """Lê foto, preço, endereço e detalhes de uma página de anúncio."""
+    """Lê foto, preço, endereço e detalhes de uma página de anúncio.
+
+    A foto do JSON-LD (específica do anúncio) tem prioridade sobre a de og:image/twitter:image,
+    que em vários sites é o logo da marca e não a foto do carro. Imagens que parecem
+    logo/ícone/genéricas são descartadas: é melhor mostrar "sem foto" do que a imagem errada.
+    """
     soup = BeautifulSoup(conteudo, "html.parser")
     d = {"thumb": "", "preco": 0.0, "ano": None, "km": None, "endereco": "", "cidade": "",
          "uf": "", "combustivel": "", "cambio": ""}
-
-    og = soup.find("meta", property="og:image") or soup.find("meta", attrs={"name": "twitter:image"})
-    if og and og.get("content"):
-        d["thumb"] = og["content"]
 
     for item in _iter_jsonld(soup):
         oferta = _primeiro(item.get("offers"))
@@ -187,8 +204,7 @@ def parse_pagina(conteudo) -> dict:
             img = _primeiro(item.get("image"))
             if isinstance(img, dict):
                 img = img.get("url")
-            if isinstance(img, str):
-                d["thumb"] = img
+            d["thumb"] = _foto_valida(img)
         odometro = item.get("mileageFromOdometer")
         if isinstance(odometro, dict) and d["km"] is None:
             km = para_float(odometro.get("value") or 0)
@@ -198,6 +214,13 @@ def parse_pagina(conteudo) -> dict:
             d["ano"] = int(str(ano)[:4])
         d["combustivel"] = d["combustivel"] or str(item.get("fuelType") or "")
         d["cambio"] = d["cambio"] or str(item.get("vehicleTransmission") or "")
+
+    if not d["thumb"]:
+        # og:image/twitter:image só entra se a JSON-LD não trouxe nada: em muitos sites
+        # essa tag aponta pro logo da marca, não pra foto do anúncio.
+        og = soup.find("meta", property="og:image") or soup.find("meta", attrs={"name": "twitter:image"})
+        if og:
+            d["thumb"] = _foto_valida(og.get("content"))
 
     d["cambio"] = extrair_campos(d["cambio"])["cambio"]
     d["combustivel"] = extrair_campos(d["combustivel"])["combustivel"]
@@ -288,8 +311,6 @@ def buscar_anuncios(termo: str, fontes: tuple, detalhar: bool = True) -> tuple[l
 
     for anuncio in anuncios:
         anuncio["tipo"] = "anuncio" if anuncio["preco"] > 0 else "pagina"
-    if not anuncios and not avisos:
-        avisos.append("Nenhum resultado. Tente outro termo, por exemplo só a marca e o modelo.")
     return anuncios, avisos
 
 

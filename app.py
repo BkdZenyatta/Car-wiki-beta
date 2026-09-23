@@ -16,6 +16,7 @@ paginas = st.navigation(
         st.Page("views/wiki.py", title="Wiki do carro", icon=":material/menu_book:"),
         st.Page("views/comparar.py", title="Comparar", icon=":material/compare_arrows:"),
         st.Page("views/tabela_fipe.py", title="Tabela FIPE", icon=":material/payments:"),
+        st.Page("views/admin.py", title="Admin", icon=":material/lock:"),
     ]
 )
 paginas.run()
